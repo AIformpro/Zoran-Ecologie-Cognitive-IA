@@ -1,0 +1,10 @@
+project:
+  name: Zoran-Ecologie-Cognitive-IA
+  author: Frédéric Tabary
+  contact: tabary01@gmail.com
+  license: MIT
+  version: 0.1
+  description: |
+    Cadre inédit pour mesurer l’impact écologique cognitif des IA : PixelScore cognitif,
+    rollback ΔM11.3, label Eco-Cognitive Inside. 
+    Premier repo mondial sur ce champ vierge.

@@ -1,0 +1,104 @@
+name: Import ZIP into repo
+
+on:
+  workflow_dispatch:
+    inputs:
+      zip_url:
+        description: "Public URL of the ZIP to import (e.g., from GitHub Releases, Dropbox with direct link, etc.)"
+        required: true
+        type: string
+      target_subdir:
+        description: "Optional subdirectory to place contents (default repo root)"
+        required: false
+        default: ""
+        type: string
+      commit_message:
+        description: "Custom commit message (optional)"
+        required: false
+        default: "chore(import): import ZIP contents via workflow"
+        type: string
+      create_branch:
+        description: "Create a new branch for the import (recommended)"
+        required: false
+        default: true
+        type: boolean
+      branch_name:
+        description: "Branch name to create/use when create_branch=true"
+        required: false
+        default: "import-20250826-155844"
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  import:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Prepare
+        run: |
+          sudo apt-get update -y
+          sudo apt-get install -y unzip rsync
+
+      - name: Download ZIP
+        run: |
+          set -e
+          curl -L "${{ inputs.zip_url }}" -o /tmp/archive.zip
+          file /tmp/archive.zip
+
+      - name: Extract ZIP
+        run: |
+          set -e
+          mkdir -p import_tmp
+          unzip -o /tmp/archive.zip -d import_tmp
+          # If the zip contains a single top-level folder, flatten it
+          python - << 'PY'
+import os, shutil, sys
+root = "import_tmp"
+entries = [e for e in os.listdir(root) if not e.startswith('__MACOSX')]
+if len(entries) == 1 and os.path.isdir(os.path.join(root, entries[0])):
+    inner = os.path.join(root, entries[0])
+    for item in os.listdir(inner):
+        shutil.move(os.path.join(inner, item), root)
+    shutil.rmtree(inner)
+PY
+
+      - name: Create target directory
+        run: |
+          if [ -n "${{ inputs.target_subdir }}" ]; then
+            mkdir -p "${{ inputs.target_subdir }}"
+          fi
+
+      - name: Rsync files (exclude protected paths)
+        run: |
+          set -e
+          TARGET="${{ inputs.target_subdir }}"
+          RSYNC_TARGET="."
+          if [ -n "$TARGET" ]; then
+            RSYNC_TARGET="$TARGET/"
+          fi
+          rsync -av --delete             --exclude '.git/'             --exclude '.github/workflows/'             import_tmp/ "$RSYNC_TARGET"
+
+      - name: Configure git user
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - name: Create branch (optional)
+        if: ${{ inputs.create_branch }}
+        run: |
+          git checkout -b "${{ inputs.branch_name }}" || git checkout "${{ inputs.branch_name }}"
+
+      - name: Commit & push
+        run: |
+          set -e
+          git add -A
+          if git diff --cached --quiet; then
+            echo "No changes detected. Exiting."
+            exit 0
+          fi
+          git commit -m "${{ inputs.commit_message }}"
+          git push origin HEAD
