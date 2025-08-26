@@ -1,0 +1,2 @@
+# Zoran-Ecologie-Cognitive-IA
+Zoran lance le premier indice d’écologie cognitive des IA : PixelScore cognitif, rollback ΔM11.3, label Eco-Cognitive Inside.
